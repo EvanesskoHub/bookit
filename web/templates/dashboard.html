@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookIt — Дашборд {{ user.username or user.telegram_id }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+        .header h1 { font-size: 2em; margin-bottom: 5px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; }
+        .stat-card .number { font-size: 2em; font-weight: bold; color: #667eea; }
+        .stat-card .label { color: #666; font-size: 0.9em; margin-top: 5px; }
+        .section { background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        .section h2 { margin-bottom: 15px; color: #444; }
+        .bookshelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
+        .book-card { text-align: center; transition: transform 0.2s; }
+        .book-card:hover { transform: translateY(-5px); }
+        .book-cover { width: 120px; height: 180px; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); background: #e0e0e0; }
+        .book-cover.placeholder { background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: white; font-size: 0.8em; padding: 10px; text-align: center; }
+        .book-title { font-size: 0.9em; margin-top: 8px; font-weight: bold; }
+        .book-author { font-size: 0.8em; color: #666; }
+        .book-rating { color: #f39c12; font-size: 0.9em; }
+        .quotes-list { max-height: 300px; overflow-y: auto; }
+        .quote-item { padding: 10px 0; border-bottom: 1px solid #eee; }
+        .quote-text { font-style: italic; color: #555; }
+        .quote-book { font-size: 0.8em; color: #667eea; margin-top: 5px; }
+        .word-cloud { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 15px; }
+        .word-cloud span { padding: 5px 12px; border-radius: 20px; color: white; font-weight: bold; }
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } }
+        canvas { max-height: 300px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Заголовок -->
+        <div class="header">
+            <h1>📚 BookIt</h1>
+            <p>Читательский дневник {{ user.username or user.telegram_id }}</p>
+        </div>
+
+        <!-- Карточки статистики -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="number">{{ total_books }}</div>
+                <div class="label">📚 Прочитано книг</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">{{ "%.1f"|format(avg_rating) }}</div>
+                <div class="label">⭐ Средняя оценка</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">{{ total_time }}</div>
+                <div class="label">⏱ Дней чтения</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">{{ fav_author }}</div>
+                <div class="label">🏆 Любимый автор</div>
+            </div>
+        </div>
+
+        <!-- Книжная полка -->
+        <div class="section">
+            <h2>📖 Книжная полка</h2>
+            <div class="bookshelf">
+                {% for ub in user_books %}
+                <div class="book-card">
+                    {% if ub.book.cover_url and ('http://' in ub.book.cover_url or 'https://' in ub.book.cover_url) %}
+                    <img class="book-cover" src="{{ ub.book.cover_url }}" alt="{{ ub.book.title }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="book-cover placeholder" style="display:none;">{{ ub.book.title }}</div>
+                    {% else %}
+                    <div class="book-cover placeholder">{{ ub.book.title }}</div>
+                    {% endif %}
+                    <div class="book-title">{{ ub.book.title }}</div>
+                    <div class="book-author">{{ ub.book.author }}</div>
+                    {% if ub.rating %}
+                    <div class="book-rating">⭐ {{ ub.rating }}/10</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+        <!-- Графики -->
+        <div class="section">
+            <h2>📊 Аналитика</h2>
+            <div class="charts-grid">
+                <div>
+                    <h3>Книг по месяцам</h3>
+                    <canvas id="booksByMonth"></canvas>
+                </div>
+                <div>
+                    <h3>Распределение оценок</h3>
+                    <canvas id="ratingDistribution"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Цитаты -->
+        {% if quotes %}
+        <div class="section">
+            <h2>📝 Последние цитаты</h2>
+            <div class="quotes-list">
+                {% for q in quotes %}
+                <div class="quote-item">
+                    <div class="quote-text">«{{ q.text[:200] }}{% if q.text|length > 200 %}...{% endif %}»</div>
+                    <div class="quote-book">— {{ q.book.title }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Облако слов -->
+        {% if word_counts %}
+        <div class="section">
+            <h2>☁️ Облако слов из цитат</h2>
+            <div class="word-cloud">
+                {% for word, count in word_counts %}
+                <span style="background: hsl({{ (count * 50) % 360 }}, 70%, 50%); font-size: {{ 0.8 + count * 0.1 }}em;">
+                    {{ word }}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // График: книги по месяцам
+        const ctx1 = document.getElementById('booksByMonth').getContext('2d');
+        new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: {{ months_labels|tojson }},
+                datasets: [{
+                    label: 'Книг прочитано',
+                    data: {{ months_data|tojson }},
+                    backgroundColor: '#667eea',
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+
+        // График: распределение оценок
+        const ctx2 = document.getElementById('ratingDistribution').getContext('2d');
+        const ratingData = {{ rating_distribution|tojson }};
+        new Chart(ctx2, {
+            type: 'bar',
+            data: {
+                labels: [1,2,3,4,5,6,7,8,9,10],
+                datasets: [{
+                    label: 'Количество оценок',
+                    data: [1,2,3,4,5,6,7,8,9,10].map(i => ratingData[i] || 0),
+                    backgroundColor: '#764ba2',
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+    </script>
+</body>
+</html>

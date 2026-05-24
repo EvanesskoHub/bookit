@@ -1,0 +1,15 @@
+venv/
+.venv/
+env/
+.env
+__pycache__/
+*.pyc
+.idea/
+.vscode/
+*.swp
+.DS_Store
+*.log
+bot/bot.log
+postgres_data/
+state/
+bot/alembic.ini
