@@ -1,5 +1,6 @@
 # 📚 BookIt — Reading Journal
 
+[![Tests](https://github.com/EvanesskoHub/bookit/actions/workflows/tests.yml/badge.svg)](https://github.com/EvanesskoHub/bookit/actions/workflows/tests.yml)
 [![Python](https://img.shields.io/badge/Python-3.11-blue)](https://python.org)
 [![Aiogram](https://img.shields.io/badge/Aiogram-3.x-green)](https://github.com/aiogram/aiogram)
 [![Flask](https://img.shields.io/badge/Flask-3.0-lightgrey)](https://flask.palletsprojects.com/)
